@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <fstream>
+#include <iostream>
 #include <span>
 #include <vector>
 
@@ -27,7 +28,7 @@ class EcpGroup {
   // Fucking w this function probably invalidates any previously-generated keys.
   EcpGroup() {
     mbedtls_ecp_group_init(&group_);
-    ASSERT(mbedtls_ecp_group_load(&group_, MBEDTLS_ECP_DP_CURVE25519) == 0,
+    ASSERT(mbedtls_ecp_group_load(&group_, MBEDTLS_ECP_DP_SECP256R1) == 0,
            "Failed to load ECP group.");
   }
 
@@ -44,9 +45,10 @@ EcpGroup ecp_group;
 void Hash(std::span<const std::byte> message,
           std::span<std::byte, kSha256Bytes> output) {
   int ret = mbedtls_sha256(
-      reinterpret_cast<const unsigned char*>(message.data()), message.size_bytes(),
-      reinterpret_cast<unsigned char*>(output.data()), /*is224=*/0);
-  ASSERT(ret, "Failed to hash message.");
+      reinterpret_cast<const unsigned char*>(message.data()),
+      message.size_bytes(), reinterpret_cast<unsigned char*>(output.data()),
+      /*is224=*/0);
+  ASSERT(ret == 0, "Failed to hash message.");
 }
 
 void WritePublicKeyToFile(const mbedtls_ecp_point& key) {
@@ -115,7 +117,7 @@ mbedtls_ecp_keypair ReadPrivateKeyFromFile(const char* file_path) {
   mbedtls_ecp_keypair key = {};
   mbedtls_ecp_keypair_init(&key);
 
-  mbedtls_ecp_read_key(MBEDTLS_ECP_DP_CURVE25519, &key, contents.data(),
+  mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256R1, &key, contents.data(),
                        contents.size());
   return key;
 }
@@ -138,7 +140,7 @@ void GenerateNewKeyPair() {
                                   nullptr, 0);
   ASSERT(ret == 0, "Failed to seed RNG.");
 
-  ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_CURVE25519, &key_pair,
+  ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, &key_pair,
                             mbedtls_ctr_drbg_random, &rng_context);
   ASSERT(ret == 0, "Failed to generate key pair.");
 
@@ -157,9 +159,9 @@ void GenerateNewKeyPair() {
   mbedtls_ctr_drbg_free(&rng_context);
 }
 
-void SignMessage(std::span<const std::byte> message,
-                 const mbedtls_ecp_keypair& key_pair,
-                 std::span<std::byte, kSignatureLengthBytes> signature) {
+std::size_t SignMessage(
+    std::span<const std::byte> message, const mbedtls_ecp_keypair& key_pair,
+    std::span<std::byte, kMaxSignatureLengthBytes> signature) {
   mbedtls_ecdsa_context signing_context = {};
   mbedtls_ecdsa_init(&signing_context);
 
@@ -194,6 +196,8 @@ void SignMessage(std::span<const std::byte> message,
   mbedtls_ecdsa_free(&signing_context);
   mbedtls_entropy_free(&entropy);
   mbedtls_ctr_drbg_free(&rng_context);
+
+  return write_bytes;
 }
 
 // Verify message w/ key

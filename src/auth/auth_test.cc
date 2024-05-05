@@ -1,6 +1,8 @@
 #include "src/auth/auth.h"
 
 #include <cstdio>
+#include <iomanip>
+#include <ios>
 #include <span>
 #include <string>
 
@@ -11,6 +13,24 @@
 
 namespace dynamic_dns::auth {
 namespace {
+
+[[maybe_unused]] void PrintBytesAsHex(std::span<const std::byte> bytes) {
+  std::ios_base::fmtflags f(std::cerr.flags());
+
+  std::cerr << "print " << bytes.size() << " bytes..." << std::endl;
+  // 8 bytes per row
+  std::size_t num_rows = (bytes.size() + 8 - 1) / 8;
+  for (std::size_t i = 0; i < num_rows; ++i) {
+    for (std::size_t j = 0; j < 8; ++j) {
+      std::size_t true_index = (i * 8) + j;
+      if (true_index >= bytes.size()) break;
+      std::cerr << " " << std::setw(2) << std::setfill('0') << std::hex
+                << static_cast<int>(bytes[true_index]);
+    }
+    std::cerr << std::endl;
+  }
+  std::cerr.flags(f);
+}
 
 constexpr bool kGenerateNewKeyPair = false;
 
@@ -24,11 +44,11 @@ TEST(AuthTest, TestGenerateNewKeyPair) {
 
     mbedtls_ecp_group group;
     mbedtls_ecp_group_init(&group);
-    ASSERT(mbedtls_ecp_group_load(&group, MBEDTLS_ECP_DP_CURVE25519) == 0,
+    ASSERT(mbedtls_ecp_group_load(&group, MBEDTLS_ECP_DP_SECP256R1) == 0,
            "Failed to load ECP group.");
 
     ASSERT_EQ(mbedtls_ecp_check_pubkey(&group, &pub_key), 0);
-    ASSERT_EQ(mbedtls_ecp_set_public_key(MBEDTLS_ECP_DP_CURVE25519, &priv_key,
+    ASSERT_EQ(mbedtls_ecp_set_public_key(MBEDTLS_ECP_DP_SECP256R1, &priv_key,
                                          &pub_key),
               0);
 
@@ -63,13 +83,13 @@ TEST(AuthTest, TestSignMessage) {
 
   mbedtls_ecp_group group;
   mbedtls_ecp_group_init(&group);
-  ASSERT(mbedtls_ecp_group_load(&group, MBEDTLS_ECP_DP_CURVE25519) == 0,
+  ASSERT(mbedtls_ecp_group_load(&group, MBEDTLS_ECP_DP_SECP256R1) == 0,
          "Failed to load ECP group.");
 
   ASSERT_EQ(mbedtls_ecp_check_pubkey(&group, &pub_key), 0);
-  ASSERT_EQ(mbedtls_ecp_set_public_key(MBEDTLS_ECP_DP_CURVE25519, &priv_key,
-                                       &pub_key),
-            0);
+  ASSERT_EQ(
+      mbedtls_ecp_set_public_key(MBEDTLS_ECP_DP_SECP256R1, &priv_key, &pub_key),
+      0);
 
   // Initialize entropy context.
   mbedtls_entropy_context entropy;
@@ -89,15 +109,40 @@ TEST(AuthTest, TestSignMessage) {
             0);
 
   constexpr const char* kMessage = "Hello my name is Jake.";
-  std::byte signature[kSignatureLengthBytes];
+  std::byte signature[kMaxSignatureLengthBytes];
 
- SignMessage(std::span<const std::byte>(reinterpret_cast<const std::byte*>(kMessage), strlen(kMessage)),
-             priv_key,
-                 std::span(signature));
+  std::size_t sig_size = SignMessage(
+      std::span<const std::byte>(reinterpret_cast<const std::byte*>(kMessage),
+                                 strlen(kMessage)),
+      priv_key, std::span(signature));
+
+  std::string corrupted_message = kMessage;
+  corrupted_message[0] = 'J';
+  std::byte signature_of_corrupted_message[kMaxSignatureLengthBytes];
+
+  std::size_t corrupt_sig_size = SignMessage(
+      std::span<const std::byte>(
+          reinterpret_cast<const std::byte*>(corrupted_message.c_str()),
+          corrupted_message.size()),
+      priv_key, std::span(signature_of_corrupted_message));
 
   mbedtls_ecp_keypair_free(&priv_key);
   mbedtls_ecp_point_free(&pub_key);
   mbedtls_ecp_group_free(&group);
+
+  if (corrupt_sig_size != sig_size) {
+    SUCCEED();
+    return;
+  }
+
+  for (std::size_t i = 0; i < sig_size; ++i) {
+    if (signature[i] != signature_of_corrupted_message[i]) {
+      SUCCEED();
+      return;
+    }
+  }
+
+  FAIL();
 }
 }  // namespace
 }  // namespace dynamic_dns::auth
