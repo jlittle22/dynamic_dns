@@ -28,4 +28,10 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
+find_package(Protobuf REQUIRED)
+include_directories(${Protobuf_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+add_subdirectory(external/mbedtls)
+
 add_subdirectory(src)

@@ -1,9 +1,18 @@
-set(DYNAMIC_DNS_TARGET src.main)
+add_subdirectory(auth)
+add_subdirectory(common)
+add_subdirectory(core)
+add_subdirectory(protobuf)
+
+set(DYNAMIC_DNS_TARGET partner)
 
 add_executable(${DYNAMIC_DNS_TARGET})
 
-### Sources
 target_sources(${DYNAMIC_DNS_TARGET}
   PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/main.cc
+)
+
+target_link_libraries(${DYNAMIC_DNS_TARGET}
+  PRIVATE
+    src.protobuf.packet
 )
