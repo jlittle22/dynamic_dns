@@ -159,6 +159,41 @@ void GenerateNewKeyPair() {
   mbedtls_ctr_drbg_free(&rng_context);
 }
 
+void SetAndValidatePublicKeyInKeyPair(mbedtls_ecp_keypair& private_key,
+                                      const mbedtls_ecp_point& public_key) {
+  mbedtls_ecp_group group;
+  mbedtls_ecp_group_init(&group);
+  ASSERT(mbedtls_ecp_group_load(&group, MBEDTLS_ECP_DP_SECP256R1) == 0,
+         "Failed to load ECP group.");
+
+  ASSERT(mbedtls_ecp_check_pubkey(&group, &public_key) == 0,
+         "Public key is invalid.");
+  ASSERT(mbedtls_ecp_set_public_key(MBEDTLS_ECP_DP_SECP256R1, &private_key,
+                                    &public_key) == 0,
+         "Can't set public key in key pair.");
+
+  // Initialize entropy context.
+  mbedtls_entropy_context entropy;
+  mbedtls_entropy_init(&entropy);
+
+  // Initialize RNG context.
+  mbedtls_ctr_drbg_context rng_context = {};
+  mbedtls_ctr_drbg_init(&rng_context);
+
+  // Seed the RNG context.
+  int ret = mbedtls_ctr_drbg_seed(&rng_context, mbedtls_entropy_func, &entropy,
+                                  nullptr, 0);
+  ASSERT(ret == 0, "Failed to seed RNG.");
+
+  ASSERT(mbedtls_ecp_check_pub_priv(&private_key, &private_key,
+                                    mbedtls_ctr_drbg_random, &rng_context) == 0,
+         "Public key isn't consistent with private key.");
+
+  mbedtls_ecp_group_free(&group);
+  mbedtls_entropy_free(&entropy);
+  mbedtls_ctr_drbg_free(&rng_context);
+}
+
 std::size_t SignMessage(
     std::span<const std::byte> message, const mbedtls_ecp_keypair& key_pair,
     std::span<std::byte, kMaxSignatureLengthBytes> signature) {
