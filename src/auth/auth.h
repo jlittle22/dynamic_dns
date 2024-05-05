@@ -20,6 +20,8 @@ mbedtls_ecp_point ReadPublicKeyFromFile(const char* file_path);
 // Client must call `mbedtls_ecp_keypair_free`.
 mbedtls_ecp_keypair ReadPrivateKeyFromFile(const char* file_path);
 
+// Combines a private and public key into a single key pair (populated in
+// `private_key`). Validates that the two keys are in fact a correct pair.
 void SetAndValidatePublicKeyInKeyPair(mbedtls_ecp_keypair& private_key,
                                       const mbedtls_ecp_point& public_key);
 
@@ -32,6 +34,12 @@ void GenerateNewKeyPair();
 std::size_t SignMessage(
     std::span<const std::byte> message, const mbedtls_ecp_keypair& key_pair,
     std::span<std::byte, kMaxSignatureLengthBytes> signature);
+
+// Returns `true` if the `message` and `signature` are congruent with
+// `public_key`. Returns false otherwise.
+bool IsMessageAuthentic(std::span<const std::byte> message,
+                        std::span<const std::byte> signature,
+                        const mbedtls_ecp_point& public_key);
 
 // Verify message w/ key
 

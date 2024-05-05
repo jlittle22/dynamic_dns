@@ -235,6 +235,44 @@ std::size_t SignMessage(
   return write_bytes;
 }
 
-// Verify message w/ key
+bool IsMessageAuthentic(std::span<const std::byte> message,
+                        std::span<const std::byte> signature,
+                        const mbedtls_ecp_point& public_key) {
+  mbedtls_ecdsa_context signing_context = {};
+  mbedtls_ecdsa_init(&signing_context);
 
+  // Verify the public key belongs to the group.
+  mbedtls_ecp_group group;
+  mbedtls_ecp_group_init(&group);
+  ASSERT(mbedtls_ecp_group_load(&group, MBEDTLS_ECP_DP_SECP256R1) == 0,
+         "Failed to load ECP group.");
+
+  ASSERT(mbedtls_ecp_check_pubkey(&group, &public_key) == 0,
+         "Public key is invalid for the group.");
+
+  mbedtls_ecp_keypair public_key_as_pair = {};
+  mbedtls_ecp_keypair_init(&public_key_as_pair);
+
+  ASSERT(mbedtls_ecp_set_public_key(MBEDTLS_ECP_DP_SECP256R1,
+                                    &public_key_as_pair, &public_key) == 0,
+         "Can't set public key in key pair.");
+
+  int ret = mbedtls_ecdsa_from_keypair(&signing_context, &public_key_as_pair);
+  ASSERT(ret == 0, "Failed to create ECDSA context from keypair.");
+
+  // Compute the message's hash.
+  std::byte hash_buffer[kSha256Bytes];
+  Hash(message, std::span<std::byte, kSha256Bytes>(hash_buffer));
+
+  ret = mbedtls_ecdsa_read_signature(
+      &signing_context, reinterpret_cast<unsigned char*>(hash_buffer),
+      kSha256Bytes, reinterpret_cast<const unsigned char*>(signature.data()),
+      signature.size());
+
+  mbedtls_ecdsa_free(&signing_context);
+  mbedtls_ecp_keypair_free(&public_key_as_pair);
+  mbedtls_ecp_group_free(&group);
+
+  return ret == 0;
+}
 }  // namespace dynamic_dns::auth

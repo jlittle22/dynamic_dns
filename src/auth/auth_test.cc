@@ -118,5 +118,44 @@ TEST(AuthTest, TestSignMessage) {
 
   FAIL();
 }
+
+TEST(AuthTest, IsMessageAuthentic) {
+  mbedtls_ecp_point pub_key = ReadPublicKeyFromFile("public.key");
+  mbedtls_ecp_keypair priv_key = ReadPrivateKeyFromFile("private.key");
+
+  SetAndValidatePublicKeyInKeyPair(priv_key, pub_key);
+
+  char message[] = "Hello my name is Jake.";
+  auto message_span = std::span<std::byte>(
+      reinterpret_cast<std::byte*>(message), strlen(message));
+
+  std::byte signature[kMaxSignatureLengthBytes];
+
+  std::size_t sig_size =
+      SignMessage(message_span, priv_key, std::span(signature));
+
+  EXPECT_TRUE(IsMessageAuthentic(message_span, std::span(signature, sig_size),
+                                 pub_key));
+
+  // Corrupt the message.
+  char before = message[0];
+  message[0] = 'J';
+  EXPECT_FALSE(IsMessageAuthentic(message_span, std::span(signature, sig_size),
+                                  pub_key));
+
+  // Restore the message.
+  message[0] = before;
+  EXPECT_TRUE(IsMessageAuthentic(message_span, std::span(signature, sig_size),
+                                 pub_key));
+
+  // Corrupt the signature.
+  signature[0] = static_cast<std::byte>(static_cast<uint8_t>(signature[0]) ^
+                                        static_cast<uint8_t>(0xFF));
+  EXPECT_FALSE(IsMessageAuthentic(message_span, std::span(signature, sig_size),
+                                  pub_key));
+
+  mbedtls_ecp_keypair_free(&priv_key);
+  mbedtls_ecp_point_free(&pub_key);
+}
 }  // namespace
 }  // namespace dynamic_dns::auth
