@@ -26,6 +26,7 @@ target_link_libraries(${AUTH_TARGET}
 target_link_libraries(${AUTH_TARGET}
   PRIVATE
     src.common.assert
+    src.common.log
 )
 
 set(AUTH_TEST_TARGET "${AUTH_TARGET}_test")

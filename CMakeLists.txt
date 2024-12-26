@@ -32,6 +32,7 @@ find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+SET(ENABLE_TESTING OFF)
 add_subdirectory(external/mbedtls)
 
 add_subdirectory(src)

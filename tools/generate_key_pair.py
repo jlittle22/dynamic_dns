@@ -7,3 +7,9 @@ public_key.verify(signature, b"my authenticated message")
 
 print(f"public:  {public_key.public_bytes_raw()}")
 print(f"private: {private_key.private_bytes_raw()}")
+
+with open('public.key', 'wb') as f:
+    f.write(public_key.public_bytes_raw())
+
+with open('private.key', 'wb') as f:
+    f.write(private_key.private_bytes_raw())

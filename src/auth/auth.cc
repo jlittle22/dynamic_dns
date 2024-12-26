@@ -1,3 +1,4 @@
+#define LOG_TAG "Auth"
 #include "src/auth/auth.h"
 
 #include <cstddef>
@@ -13,6 +14,7 @@
 #include "external/mbedtls/include/mbedtls/md.h"
 #include "external/mbedtls/include/mbedtls/sha256.h"
 #include "src/common/assert.h"
+#include "src/common/log.h"
 
 namespace dynamic_dns::auth {
 namespace {
@@ -94,7 +96,9 @@ void WritePrivateKeyToFile(const mbedtls_ecp_keypair& key) {
 }  // namespace
 
 mbedtls_ecp_point ReadPublicKeyFromFile(const char* file_path) {
+  LOGE("Attempting to open file %s\n", file_path);
   std::ifstream stream(file_path, std::ios::in | std::ios::binary);
+  ASSERT(stream.is_open(), "Failed to open public key file.");
   std::vector<unsigned char> contents((std::istreambuf_iterator<char>(stream)),
                                       std::istreambuf_iterator<char>());
 
@@ -103,6 +107,8 @@ mbedtls_ecp_point ReadPublicKeyFromFile(const char* file_path) {
 
   int ret = mbedtls_ecp_point_read_binary(ecp_group.Get(), &public_key,
                                           contents.data(), contents.size());
+  LOGE("Status %d\n", ret);
+  LOGE("contents size %zu\n", contents.size());
   ASSERT(ret == 0, "Failed to read public key from file.");
 
   return public_key;

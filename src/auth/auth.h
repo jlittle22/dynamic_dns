@@ -28,7 +28,7 @@ void SetAndValidatePublicKeyInKeyPair(mbedtls_ecp_keypair& private_key,
 // Generates a new key pair and writes them to `private.key` and `public.key`.
 void GenerateNewKeyPair();
 
-// Signs `message` using the private / public `key_pair`. The signatue is
+// Signs `message` using the private / public `key_pair`. The signature is
 // written to `signature`. This function returns the length of the signature
 // in bytes.
 std::size_t SignMessage(

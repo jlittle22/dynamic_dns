@@ -14,5 +14,10 @@ target_sources(${DYNAMIC_DNS_TARGET}
 
 target_link_libraries(${DYNAMIC_DNS_TARGET}
   PRIVATE
+    src.core.address_monitor
+    src.core.config
+    src.core.network
+    src.common.log
     src.protobuf.packet
+
 )
